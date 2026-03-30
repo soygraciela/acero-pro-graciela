@@ -91,6 +91,17 @@ export default function App() {
   const [elapsedTime, setElapsedTime] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [fastingGoal, setFastingGoal] = useState(16);
 
+  // --- INYECCIÓN MÁGICA DE ESTILOS (TAILWIND CSS) ---
+  // Esto fuerza a Vercel a cargar los colores y diseño automáticamente
+  useEffect(() => {
+    if (!document.getElementById('tailwind-cdn')) {
+      const script = document.createElement('script');
+      script.id = 'tailwind-cdn';
+      script.src = 'https://cdn.tailwindcss.com';
+      document.head.appendChild(script);
+    }
+  }, []);
+
   // Perfil por defecto (Meta de 60kg)
   const [profile, setProfile] = useState({
     name: "Graciela Arredondo",
