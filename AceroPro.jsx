@@ -216,24 +216,32 @@ export default function App() {
 
   // --- FIREBASE & PERSISTENCE ---
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (error) {
-        console.error("Error de Firebase Auth:", error);
-        // Si sale un error aquí, suele ser porque no has activado 
-        // el proveedor "Anónimo" en la consola de Firebase.
-      } finally {
-        // Aseguramos que la pantalla de carga desaparezca sin importar qué pase
+    let isAuthenticating = false;
+    
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        // ¡ÉXITO! Firebase encontró tu sesión anterior. Carga tus datos.
+        setUser(currentUser);
         setLoading(false);
+      } else {
+        // Solo si no hay sesión guardada, creamos un nuevo usuario anónimo
+        if (!isAuthenticating) {
+          isAuthenticating = true;
+          try {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+              await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+              await signInAnonymously(auth);
+            }
+          } catch (error) {
+            console.error("Error de Firebase Auth:", error);
+            setLoading(false);
+          }
+          isAuthenticating = false;
+        }
       }
-    };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, setUser);
+    });
+    
     return () => unsubscribe();
   }, []);
 
