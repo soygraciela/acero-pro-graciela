@@ -8,7 +8,7 @@ import { Scale, Flame, Activity, Target, Trash2, CheckCircle2, Clock, Settings, 
 const firebaseConfig = typeof __firebase_config !== 'undefined' 
   ? JSON.parse(__firebase_config) 
   : {
-      apiKey: "AIzaSyDm_VLIHWR9Fu6fZQZZK_Wvap28HAkePfI",
+      apiKey: "AIzaSyDm_vl1HWR9Fu6fZQZZK_Wvap28HAkePfI",
       authDomain: "aceropro-b6832.firebaseapp.com",
       projectId: "aceropro-b6832",
       storageBucket: "aceropro-b6832.firebasestorage.app",
@@ -206,12 +206,20 @@ export default function App() {
   // --- FIREBASE & PERSISTENCE ---
   useEffect(() => {
     const initAuth = async () => {
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        await signInWithCustomToken(auth, __initial_auth_token);
-      } else {
-        await signInAnonymously(auth);
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (error) {
+        console.error("Error de Firebase Auth:", error);
+        // Si sale un error aquí, suele ser porque no has activado 
+        // el proveedor "Anónimo" en la consola de Firebase.
+      } finally {
+        // Aseguramos que la pantalla de carga desaparezca sin importar qué pase
+        setLoading(false);
       }
-      setLoading(false);
     };
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, setUser);
