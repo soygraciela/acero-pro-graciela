@@ -5,7 +5,17 @@ import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, dele
 import { Scale, Flame, Activity, Target, Trash2, CheckCircle2, Clock, Settings, Zap, RotateCcw, PlayCircle, Trophy, Calendar, CheckSquare, Timer, RefreshCw, Info, History, User, Youtube, Play, AlertCircle, Moon, Sun, ChevronRight, X, Dumbbell, HeartPulse, Medal, Droplets, FlaskConical, TrendingUp } from 'lucide-react';
 
 // --- FIREBASE SETUP ---
-const firebaseConfig = JSON.parse(__firebase_config);
+const firebaseConfig = typeof __firebase_config !== 'undefined' 
+  ? JSON.parse(__firebase_config) 
+  : {
+      apiKey: "AIzaSyDm_VLIHWR9Fu6fZQZZK_Wvap28HAkePfI",
+      authDomain: "aceropro-b6832.firebaseapp.com",
+      projectId: "aceropro-b6832",
+      storageBucket: "aceropro-b6832.firebasestorage.app",
+      messagingSenderId: "1024479446926",
+      appId: "1:1024479446926:web:b934d19648ec268b2706df",
+      measurementId: "G-4PQY15BY05"
+    };
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
