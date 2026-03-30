@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, deleteDoc, query, orderBy, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { Scale, Flame, Activity, Target, Trash2, CheckCircle2, Clock, Settings, Zap, RotateCcw, PlayCircle, Trophy, Calendar, CheckSquare, Timer, RefreshCw, Info, History, User, Youtube, Play, AlertCircle, Moon, Sun, ChevronRight, X, Dumbbell, HeartPulse, Medal, Droplets, FlaskConical, TrendingUp } from 'lucide-react';
+import { Scale, Flame, Activity, Target, Trash2, CheckCircle2, Clock, Settings, Zap, RotateCcw, PlayCircle, Trophy, Calendar, CheckSquare, Timer, RefreshCw, Info, History, User, Youtube, Play, AlertCircle, Moon, Sun, ChevronRight, X, Dumbbell, HeartPulse, Medal, Droplets, FlaskConical, TrendingUp, Mail, Lock, LogOut } from 'lucide-react';
 
 // --- FIREBASE SETUP ---
 const firebaseConfig = typeof __firebase_config !== 'undefined' 
@@ -64,6 +64,13 @@ const getProgressedStats = (baseS, baseR, level) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // Estados para Login/Registro
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+
   const [activeTab, setActiveTab] = useState('lun');
   const [history, setHistory] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
@@ -179,6 +186,44 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 5000);
   };
 
+  // --- LOGIC PARA LOGIN Y REGISTRO ---
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    if (!email || !password) {
+        showAlert("Por favor, llena todos los campos.", true);
+        return;
+    }
+    setAuthLoading(true);
+    try {
+        if (isRegistering) {
+            await createUserWithEmailAndPassword(auth, email, password);
+            showAlert("¡Cuenta creada con éxito!");
+        } else {
+            await signInWithEmailAndPassword(auth, email, password);
+            showAlert("¡Bienvenida de nuevo!");
+        }
+    } catch (error) {
+        console.error("Auth Error:", error);
+        if (error.code === 'auth/email-already-in-use') showAlert("Ese correo ya está registrado.", true);
+        else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') showAlert("Contraseña incorrecta.", true);
+        else if (error.code === 'auth/weak-password') showAlert("La contraseña debe tener al menos 6 caracteres.", true);
+        else showAlert("Error al iniciar sesión. Verifica tus datos o habilita Correo/Contraseña en Firebase.", true);
+    } finally {
+        setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+      try {
+          await signOut(auth);
+          setUser(null);
+          setShowSettings(false);
+          showAlert("Sesión cerrada correctamente.");
+      } catch (error) {
+          showAlert("Error al cerrar sesión.", true);
+      }
+  };
+
   // --- CRONÓMETRO DE AYUNO PRECISO ---
   useEffect(() => {
     let interval = null;
@@ -220,31 +265,14 @@ export default function App() {
 
   // --- FIREBASE & PERSISTENCE ---
   useEffect(() => {
-    let isAuthenticating = false;
-    
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
-        setLoading(false);
       } else {
-        if (!isAuthenticating) {
-          isAuthenticating = true;
-          try {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-              await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-              await signInAnonymously(auth);
-            }
-          } catch (error) {
-            console.error("Error Auth:", error);
-            showAlert("Error de autenticación.", true);
-            setLoading(false);
-          }
-          isAuthenticating = false;
-        }
+        setUser(null);
       }
+      setLoading(false);
     });
-    
     return () => unsubscribe();
   }, []);
 
@@ -271,7 +299,6 @@ export default function App() {
       },
       (error) => {
           console.error("Error obteniendo perfil:", error);
-          showAlert("Error de permisos en Base de Datos. Ve al Paso 2 de mi instrucción.", true);
       }
     );
 
@@ -347,7 +374,7 @@ export default function App() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
         console.error("Error al guardar:", error);
-        showAlert("¡Base de datos bloqueada! Lee mis instrucciones (Paso 2) para arreglarlo.", true);
+        showAlert("¡Base de datos bloqueada! Verifica las Reglas.", true);
     }
   };
 
@@ -508,8 +535,83 @@ export default function App() {
     return MOTIVATIONAL_QUOTES[daysSinceEpoch % MOTIVATIONAL_QUOTES.length];
   }, []);
 
-  if (loading) return <div className="h-screen bg-black flex items-center justify-center text-yellow-400 font-black italic tracking-widest animate-pulse uppercase">Cargando Acero Pro...</div>;
+  if (loading) return <div className="h-screen bg-[#050505] flex flex-col items-center justify-center"><Dumbbell className="text-yellow-400 animate-bounce mb-4" size={48}/><span className="text-yellow-400 font-black italic tracking-widest uppercase animate-pulse">Cargando Acero Pro...</span></div>;
 
+  // --- PANTALLA DE LOGIN / REGISTRO ---
+  if (!user) {
+      return (
+          <div className="min-h-screen bg-[#050505] text-white font-sans flex items-center justify-center p-6 relative">
+              {/* ALERTA FLOTANTE EN LOGIN */}
+              {toastMessage && (
+                  <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[100] animate-in slide-in-from-top-4 fade-in">
+                      <div className={`px-6 py-3 rounded-full font-black italic uppercase text-xs flex items-center gap-2 shadow-[0_0_20px_rgba(0,0,0,0.5)] ${toastType === "error" ? 'bg-red-500 text-white shadow-red-500/40 border border-red-400' : 'bg-green-500 text-black shadow-green-500/40'}`}>
+                          {toastType === "error" ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+                          {toastMessage}
+                      </div>
+                  </div>
+              )}
+
+              <div className="w-full max-w-md bg-[#111] border border-white/5 rounded-[3rem] p-8 shadow-2xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-40 h-40 blur-[80px] -mr-20 -mt-20 bg-yellow-500/20"></div>
+                  
+                  <div className="text-center mb-10 relative z-10">
+                      <div className="w-20 h-20 bg-black border border-white/10 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl">
+                          <Trophy className="text-yellow-400" size={36} />
+                      </div>
+                      <h1 className="text-5xl font-black italic tracking-tighter">ACERO<span className="text-yellow-400">PRO</span></h1>
+                      <p className="text-xs text-gray-500 font-bold uppercase tracking-[0.2em] mt-2">
+                          {isRegistering ? 'Crea tu cuenta' : 'Inicia Sesión'}
+                      </p>
+                  </div>
+
+                  <form onSubmit={handleAuth} className="space-y-4 relative z-10">
+                      <div className="relative">
+                          <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={18} />
+                          <input 
+                              type="email" 
+                              placeholder="Tu correo electrónico" 
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              className="w-full bg-black/50 border border-white/10 text-white rounded-2xl pl-12 pr-4 py-4 text-sm font-bold outline-none focus:border-yellow-400 transition-colors"
+                              required
+                          />
+                      </div>
+                      <div className="relative">
+                          <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={18} />
+                          <input 
+                              type="password" 
+                              placeholder="Tu contraseña (mínimo 6 letras)" 
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              className="w-full bg-black/50 border border-white/10 text-white rounded-2xl pl-12 pr-4 py-4 text-sm font-bold outline-none focus:border-yellow-400 transition-colors"
+                              required
+                          />
+                      </div>
+                      
+                      <button 
+                          type="submit" 
+                          disabled={authLoading}
+                          className="w-full bg-yellow-400 text-black font-black italic uppercase rounded-2xl py-4 mt-6 hover:bg-yellow-300 hover:scale-[1.02] transition-all shadow-[0_0_20px_rgba(250,204,21,0.2)]"
+                      >
+                          {authLoading ? 'Cargando...' : (isRegistering ? 'Registrarme' : 'Entrar')}
+                      </button>
+                  </form>
+
+                  <div className="mt-8 text-center relative z-10 border-t border-white/10 pt-6">
+                      <button 
+                          type="button"
+                          onClick={() => setIsRegistering(!isRegistering)}
+                          className="text-xs text-gray-400 font-bold hover:text-white transition-colors uppercase tracking-widest"
+                      >
+                          {isRegistering ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate'}
+                      </button>
+                  </div>
+              </div>
+          </div>
+      );
+  }
+
+  // --- APP PRINCIPAL ---
   return (
     <div className="min-h-screen bg-[#050505] text-white font-sans pb-24 relative">
       
@@ -1094,9 +1196,12 @@ export default function App() {
                     </section>
                 </div>
 
-                <div className="p-6 border-t border-white/5 bg-black/50">
+                <div className="p-6 border-t border-white/5 bg-black/50 space-y-4">
                     <button onClick={() => saveSettings(profile)} className="w-full py-4 bg-yellow-400 text-black rounded-2xl font-black italic uppercase tracking-wider hover:bg-yellow-300 transition-all">
                         Guardar Cambios
+                    </button>
+                    <button onClick={handleLogout} className="w-full py-3 bg-red-500/10 text-red-500 border border-red-500/20 rounded-2xl font-black italic uppercase tracking-wider hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2">
+                        <LogOut size={16} /> Cerrar Sesión
                     </button>
                 </div>
             </div>
