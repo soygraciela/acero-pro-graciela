@@ -41,8 +41,8 @@ const MOTIVATIONAL_QUOTES = [
 
 // Función para calcular la sobrecarga progresiva automática
 const getProgressedStats = (baseS, baseR, level) => {
-    const extraSets = Math.floor((level - 1) / 3); // +1 serie cada 3 meses
-    const extraReps = ((level - 1) % 3) * 2; // +2 reps cada mes (se reinicia al subir serie)
+    const extraSets = Math.floor((level - 1) / 3);
+    const extraReps = ((level - 1) % 3) * 2;
 
     const finalSets = baseS + extraSets;
     let finalReps = baseR;
@@ -51,7 +51,7 @@ const getProgressedStats = (baseS, baseR, level) => {
         if (baseR.toLowerCase() === "fallo") {
             finalReps = "Fallo";
         } else if (baseR.includes("s")) {
-            finalReps = (parseInt(baseR) + extraReps * 5) + "s"; // Sube 5 segundos por mes
+            finalReps = (parseInt(baseR) + extraReps * 5) + "s";
         } else if (baseR.includes("p/l")) {
             finalReps = (parseInt(baseR) + extraReps) + " p/l";
         } else {
@@ -68,16 +68,18 @@ export default function App() {
   const [history, setHistory] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  
+  // Estado para las alertas flotantes
   const [toastMessage, setToastMessage] = useState(null);
+  const [toastType, setToastType] = useState("success"); // "success" o "error"
+
   const [showWeightModal, setShowWeightModal] = useState(false);
   const [weightInput, setWeightInput] = useState("");
   const [calories, setCalories] = useState(0);
   const [customCalories, setCustomCalories] = useState("");
   const [previewExercise, setPreviewExercise] = useState(null); 
   
-  // Hábitos Diarios
   const [habits, setHabits] = useState({ water: false, creatine: false, protein: false });
-  
   const [completedSets, setCompletedSets] = useState({});
   const [completedCardio, setCompletedCardio] = useState({});
   
@@ -86,13 +88,11 @@ export default function App() {
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [timerMode, setTimerMode] = useState('work'); 
 
-  // --- ESTADO DEL AYUNO ---
   const [fastingStart, setFastingStart] = useState(null);
   const [elapsedTime, setElapsedTime] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [fastingGoal, setFastingGoal] = useState(16);
 
   // --- INYECCIÓN MÁGICA DE ESTILOS (TAILWIND CSS) ---
-  // Esto fuerza a Vercel a cargar los colores y diseño automáticamente
   useEffect(() => {
     if (!document.getElementById('tailwind-cdn')) {
       const script = document.createElement('script');
@@ -102,17 +102,14 @@ export default function App() {
     }
   }, []);
 
-  // Perfil por defecto (Meta de 60kg)
   const [profile, setProfile] = useState({
     name: "Graciela Arredondo",
     initialWeight: 85,
     currentWeight: 85,
     targetWeight: 60,
     lastWeightUpdate: null,
-    startDate: Date.now(), // Para calcular los meses de progreso
-    dailyVideos: {
-      lun: "", mar: "", mie: "", jue: "", vie: "", sab: "", dom: ""
-    }
+    startDate: Date.now(),
+    dailyVideos: { lun: "", mar: "", mie: "", jue: "", vie: "", sab: "", dom: "" }
   });
 
   const workout = {
@@ -175,6 +172,13 @@ export default function App() {
     { id: 'c5', n: "Abdominales de Pie", goal: "20 cada pierna", type: "reps", img: "https://assets.cdn.filesafe.space/CvWCGrWG4kiyHjWFLKST/media/69caeee073e982af663ae7c1.png" }
   ];
 
+  // Función para mostrar alertas de éxito o error
+  const showAlert = (message, isError = false) => {
+    setToastMessage(message);
+    setToastType(isError ? "error" : "success");
+    setTimeout(() => setToastMessage(null), 5000);
+  };
+
   // --- CRONÓMETRO DE AYUNO PRECISO ---
   useEffect(() => {
     let interval = null;
@@ -220,11 +224,9 @@ export default function App() {
     
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        // ¡ÉXITO! Firebase encontró tu sesión anterior. Carga tus datos.
         setUser(currentUser);
         setLoading(false);
       } else {
-        // Solo si no hay sesión guardada, creamos un nuevo usuario anónimo
         if (!isAuthenticating) {
           isAuthenticating = true;
           try {
@@ -234,7 +236,8 @@ export default function App() {
               await signInAnonymously(auth);
             }
           } catch (error) {
-            console.error("Error de Firebase Auth:", error);
+            console.error("Error Auth:", error);
+            showAlert("Error de autenticación.", true);
             setLoading(false);
           }
           isAuthenticating = false;
@@ -250,26 +253,37 @@ export default function App() {
     
     // Perfil
     const pRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile');
-    const unsubP = onSnapshot(pRef, ds => { 
+    const unsubP = onSnapshot(pRef, 
+      (ds) => { 
         if (ds.exists()) {
             const data = ds.data();
-            // Asegurarnos de que tenga una fecha de inicio para calcular los meses
             if (!data.startDate) {
                 data.startDate = Date.now();
-                setDoc(pRef, data, { merge: true });
+                setDoc(pRef, data, { merge: true }).catch(err => console.error(err));
             }
             setProfile(prev => ({ ...prev, ...data }));
         } else {
-            setDoc(pRef, profile);
+            setDoc(pRef, profile).catch(err => {
+                console.error("No se pudo crear perfil", err);
+                showAlert("Firebase denegó el acceso. Habilita Firestore y ajusta las reglas.", true);
+            });
         }
-    });
+      },
+      (error) => {
+          console.error("Error obteniendo perfil:", error);
+          showAlert("Error de permisos en Base de Datos. Ve al Paso 2 de mi instrucción.", true);
+      }
+    );
 
     // Historial
     const hRef = collection(db, 'artifacts', appId, 'users', user.uid, 'history');
-    const unsubH = onSnapshot(hRef, (snapshot) => {
-      const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setHistory(docs.sort((a, b) => b.timestamp - a.timestamp));
-    });
+    const unsubH = onSnapshot(hRef, 
+      (snapshot) => {
+        const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        setHistory(docs.sort((a, b) => b.timestamp - a.timestamp));
+      },
+      (error) => console.error("Error obteniendo historial:", error)
+    );
 
     // Local Storage (Estado temporal del día)
     const saved = localStorage.getItem(`acero_v8_data_${user.uid}`);
@@ -315,61 +329,68 @@ export default function App() {
   const finalizeWorkout = async (customDayName = null) => {
     if (!user) return;
     
-    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), {
-      dayName: customDayName || workout[activeTab].name,
-      dayKey: activeTab,
-      timestamp: Date.now(),
-      dateString: new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })
-    });
+    try {
+        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), {
+          dayName: customDayName || workout[activeTab].name,
+          dayKey: activeTab,
+          timestamp: Date.now(),
+          dateString: new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })
+        });
 
-    // Limpiar estados 
-    setCompletedSets({});
-    setCompletedCardio({});
-    setCurrentRound(1);
-    
-    // Limpiar local storage de entrenamiento
-    saveToLocal({}, {}, 1, undefined, undefined, undefined, undefined);
+        // Limpiar estados 
+        setCompletedSets({});
+        setCompletedCardio({});
+        setCurrentRound(1);
+        saveToLocal({}, {}, 1, undefined, undefined, undefined, undefined);
 
-    setToastMessage("¡Entrenamiento Registrado con Éxito! Casillas reiniciadas.");
-    setTimeout(() => setToastMessage(null), 4000);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+        showAlert("¡Entrenamiento Registrado con Éxito!");
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+        console.error("Error al guardar:", error);
+        showAlert("¡Base de datos bloqueada! Lee mis instrucciones (Paso 2) para arreglarlo.", true);
+    }
   };
 
   const handleEndDayAndFast = async () => {
       if (!user) return;
       
-      if (calories > 0) {
-          await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), {
-              dayName: `Cierre de Calorías: ${calories} kcal`,
-              dayKey: 'calorias',
-              timestamp: Date.now(),
-              dateString: new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })
-          });
+      try {
+          if (calories > 0) {
+              await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), {
+                  dayName: `Cierre de Calorías: ${calories} kcal`,
+                  dayKey: 'calorias',
+                  timestamp: Date.now(),
+                  dateString: new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })
+              });
+          }
+
+          const startTime = Date.now();
+          const resetHabits = { water: false, creatine: false, protein: false };
+          
+          setFastingStart(startTime);
+          setCalories(0);
+          setHabits(resetHabits);
+          
+          saveToLocal(null, null, null, startTime, undefined, 0, resetHabits);
+          showAlert("¡Día finalizado! Ayuno iniciado.");
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (error) {
+          console.error("Error al guardar día:", error);
+          showAlert("Fallo al guardar: Base de datos no permitida.", true);
       }
-
-      // Iniciar ayuno y reiniciar hábitos diarios
-      const startTime = Date.now();
-      const resetHabits = { water: false, creatine: false, protein: false };
-      
-      setFastingStart(startTime);
-      setCalories(0);
-      setHabits(resetHabits);
-      
-      // Guardar todo
-      saveToLocal(null, null, null, startTime, undefined, 0, resetHabits);
-
-      setToastMessage("¡Día finalizado! Hábitos reiniciados y Ayuno iniciado.");
-      setTimeout(() => setToastMessage(null), 3000);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // --- GUARDAR CONFIGURACIONES ---
   const saveSettings = async (newProfile) => {
     if (!user) return;
-    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile'), newProfile);
-    setShowSettings(false);
-    setToastMessage("Ajustes guardados correctamente");
-    setTimeout(() => setToastMessage(null), 3000);
+    try {
+        await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile'), newProfile);
+        setShowSettings(false);
+        showAlert("Ajustes guardados correctamente");
+    } catch (error) {
+        console.error("Error guardando ajustes:", error);
+        showAlert("No se pudieron guardar los ajustes (Reglas Firebase).", true);
+    }
   };
 
   const handleUpdateWeight = async () => {
@@ -379,20 +400,24 @@ export default function App() {
           currentWeight: Number(weightInput),
           lastWeightUpdate: Date.now() 
       };
-      await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile'), updatedProfile);
       
-      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), {
-          dayName: `Registro de Peso: ${weightInput}kg`,
-          dayKey: 'peso',
-          timestamp: Date.now(),
-          dateString: new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })
-      });
+      try {
+          await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile'), updatedProfile);
+          await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), {
+              dayName: `Registro de Peso: ${weightInput}kg`,
+              dayKey: 'peso',
+              timestamp: Date.now(),
+              dateString: new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })
+          });
 
-      setProfile(updatedProfile);
-      setShowWeightModal(false);
-      setWeightInput("");
-      setToastMessage("¡Peso registrado con éxito!");
-      setTimeout(() => setToastMessage(null), 3000);
+          setProfile(updatedProfile);
+          setShowWeightModal(false);
+          setWeightInput("");
+          showAlert("¡Peso registrado con éxito!");
+      } catch (error) {
+          console.error("Error guardando peso:", error);
+          showAlert("Error: Firebase bloqueó el guardado.", true);
+      }
   };
 
   const addCalories = (amount) => {
@@ -407,7 +432,6 @@ export default function App() {
       saveToLocal(null, null, null, undefined, undefined, undefined, newHabits);
   };
 
-  // Calcular días desde el último registro de peso
   const daysSinceLastWeight = useMemo(() => {
       if (!profile.lastWeightUpdate) return 7; 
       return Math.floor((Date.now() - profile.lastWeightUpdate) / (1000 * 60 * 60 * 24));
@@ -415,14 +439,12 @@ export default function App() {
 
   const needsWeightUpdate = daysSinceLastWeight >= 7;
 
-  // Calcular en qué mes de entrenamiento estamos (para la sobrecarga)
   const currentMonthLevel = useMemo(() => {
       if (!profile.startDate) return 1;
       const daysActive = Math.floor((Date.now() - profile.startDate) / (1000 * 60 * 60 * 24));
       return Math.floor(daysActive / 30) + 1;
   }, [profile.startDate]);
 
-  // Fechas de peso (Último y Próximo)
   const weightDatesInfo = useMemo(() => {
       if (!profile.lastWeightUpdate) return null;
       const lastDate = new Date(profile.lastWeightUpdate);
@@ -436,7 +458,6 @@ export default function App() {
       };
   }, [profile.lastWeightUpdate, daysSinceLastWeight]);
 
-  // Agrupar historial por Mes y Año
   const groupedHistory = useMemo(() => {
       const groups = {};
       history.forEach(record => {
@@ -450,10 +471,15 @@ export default function App() {
       return groups;
   }, [history]);
 
-  // --- BORRAR HISTORIAL ---
   const deleteHistoryRecord = async (id) => {
       if (!user) return;
-      await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'history', id));
+      try {
+          await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'history', id));
+          showAlert("Registro eliminado");
+      } catch (error) {
+          console.error("Error borrando:", error);
+          showAlert("Error al intentar borrar (Reglas Firebase).", true);
+      }
   };
 
   const toggleSet = (exName, sIdx) => {
@@ -487,11 +513,11 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#050505] text-white font-sans pb-24 relative">
       
-      {/* ALERTA FLOTANTE (TOAST) */}
+      {/* ALERTA FLOTANTE CON COLORES (ROJO PARA ERROR, VERDE PARA ÉXITO) */}
       {toastMessage && (
           <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[100] animate-in slide-in-from-top-4 fade-in">
-              <div className="bg-green-500 text-black px-6 py-3 rounded-full font-black italic uppercase text-xs flex items-center gap-2 shadow-[0_0_20px_rgba(34,197,94,0.4)]">
-                  <CheckCircle2 size={16} />
+              <div className={`px-6 py-3 rounded-full font-black italic uppercase text-xs flex items-center gap-2 shadow-[0_0_20px_rgba(0,0,0,0.5)] ${toastType === "error" ? 'bg-red-500 text-white shadow-red-500/40 border border-red-400' : 'bg-green-500 text-black shadow-green-500/40'}`}>
+                  {toastType === "error" ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
                   {toastMessage}
               </div>
           </div>
