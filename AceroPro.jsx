@@ -5,17 +5,17 @@ import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, dele
 import { Scale, Flame, Activity, Target, Trash2, CheckCircle2, Clock, Settings, Zap, RotateCcw, PlayCircle, Trophy, Calendar, CheckSquare, Timer, RefreshCw, Info, History, User, Youtube, Play, AlertCircle, Moon, Sun, ChevronRight, X, Dumbbell, HeartPulse, Medal, Droplets, FlaskConical, TrendingUp, Mail, Lock, LogOut } from 'lucide-react';
 
 // --- FIREBASE SETUP ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' 
-  ? JSON.parse(__firebase_config) 
-  : {
-      apiKey: "AIzaSyDm_vl1HWR9Fu6fZQZZK_Wvap28HAkePfI",
-      authDomain: "aceropro-b6832.firebaseapp.com",
-      projectId: "aceropro-b6832",
-      storageBucket: "aceropro-b6832.firebasestorage.app",
-      messagingSenderId: "1024479446926",
-      appId: "1:1024479446926:web:b934d19648ec268b2706df",
-      measurementId: "G-4PQY15BY05"
-    };
+// Solo se actualizaron los valores internos para conectar con tu proyecto real
+const firebaseConfig = {
+    apiKey: "AIzaSyDm_vl1HWR9Fu6fZQZZK_Wvap28HAkePfI",
+    authDomain: "aceropro-b6832.firebaseapp.com",
+    projectId: "aceropro-b6832",
+    storageBucket: "aceropro-b6832.firebasestorage.app",
+    messagingSenderId: "1024479446926",
+    appId: "1:1024479446926:web:b934d19648ec268b2706df",
+    measurementId: "G-4PQY15BY05"
+};
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -1130,7 +1130,7 @@ export default function App() {
             </p>
             <button 
                 onClick={() => finalizeWorkout()}
-                className="group relative w-full max-w-sm overflow-hidden rounded-[2rem] p-1 transition-all hover:scale-105"
+                className="group relative w-full max-sm overflow-hidden rounded-[2rem] p-1 transition-all hover:scale-105"
             >
                 <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 via-green-500 to-yellow-400 animate-pulse"></div>
                 <div className="relative bg-black px-8 py-6 rounded-[1.8rem] flex items-center justify-center gap-3">
